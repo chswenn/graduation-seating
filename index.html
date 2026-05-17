@@ -32,7 +32,7 @@
         /* 講台樣式 */
         .stage-container {
             width: 100%;
-            max-width: 850px;
+            max-width: 950px;
             perspective: 500px;
             margin-bottom: 40px;
         }
@@ -65,7 +65,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 30px; /* 走道 */
+            gap: 40px; /* 走道加寬一點點 */
         }
         .row-label {
             width: 45px;
@@ -76,12 +76,12 @@
         }
         .seat-block {
             display: flex;
-            gap: 8px;
+            gap: 6px; /* 稍微縮小間距以容納一排 9 個位子 */
         }
         /* 座位基礎樣式 */
         .seat {
-            width: 52px; /* 稍微加寬以容納學號 */
-            height: 54px; /* 稍微加高 */
+            width: 52px;
+            height: 54px;
             background-color: #e0e0e0;
             border: 1px solid #bdbdbd;
             border-radius: 6px 6px 4px 4px;
@@ -180,6 +180,14 @@
             font-size: 12px;
             justify-content: center;
             box-shadow: none;
+        }
+        
+        /* 隱藏的空位 (用於排版對齊) */
+        .seat.empty {
+            background-color: transparent;
+            border: none;
+            box-shadow: none;
+            cursor: default;
         }
 
         /* 圖例說明 */
@@ -350,7 +358,7 @@
     <div class="subtitle">畢業生專屬劃位系統</div>
 
     <div class="info-bar">
-        📊 總座位數：155 席 (左側 6 席、右側 7 席、共 12 排，扣除柱子 1 席)
+        📊 總座位數：155 席 (左側 79 席、右側 76 席、共 10 排，精準真實配置)
     </div>
 
     <!-- 圖例 -->
@@ -414,69 +422,88 @@
     <script>
         const container = document.getElementById('layout-container');
         
-        const rows = 12; 
-        const leftCols = 6;
-        const rightCols = 7;
-        
         let currentActiveSeat = null;
-        let seatingData = JSON.parse(localStorage.getItem('寅葉講堂劃位資料_V3')) || {};
+        let seatingData = JSON.parse(localStorage.getItem('寅葉講堂劃位資料_V4')) || {};
 
-        const pillars = ["9-13"]; 
-        const profRows = [1, 2];       
-        const parentRows = [11, 12];   
+        const profRows = [1];       
+        const parentRows = [9, 10];   
+
+        // 精準陣列配置 ('P' = 柱子, 'E' = 空白不顯示, 數字 = 座位編號)
+        const layoutConfig = [
+            { left: ['P', 'P', 1, 2, 3, 4, 5, 6, 7], right: [1, 2, 3, 4, 5, 6, 7, 'P', 'P'] },
+            { left: ['P', 'P', 1, 2, 3, 4, 5, 6, 7], right: [1, 2, 3, 4, 5, 6, 7, 'P', 'P'] },
+            { left: ['P', 1, 2, 3, 4, 5, 6, 7, 8], right: [1, 2, 3, 4, 5, 6, 7, 8, 'P'] },
+            { left: [1, 2, 3, 4, 5, 6, 7, 8, 9], right: [1, 2, 3, 4, 5, 6, 7, 8, 9] },
+            { left: [1, 2, 3, 4, 5, 6, 7, 8, 9], right: [1, 2, 3, 4, 5, 6, 7, 8, 9] },
+            { left: [1, 2, 3, 4, 5, 6, 7, 8, 9], right: [1, 2, 3, 4, 5, 6, 7, 8, 9] },
+            { left: [1, 2, 3, 4, 5, 6, 7, 8, 9], right: [1, 2, 3, 4, 5, 6, 7, 8, 9] }, // 補齊使用者漏打的一排9個位子
+            { left: ['P', 'P', 1, 2, 3, 4, 5, 6, 7], right: [1, 2, 3, 4, 5, 6, 7, 'P', 'P'] },
+            { left: ['P', 'P', 1, 2, 3, 4, 5, 6, 7], right: [1, 2, 3, 4, 5, 6, 7, 'P', 'P'] },
+            { left: ['P', 'P', 1, 2, 3, 4, 5, 6, 7], right: [1, 2, 3, 4, 'E', 'E', 'E', 'E', 'E'] }
+        ];
 
         function initSeatingChart() {
             container.innerHTML = '';
             
-            for (let i = 1; i <= rows; i++) {
+            layoutConfig.forEach((rowConfig, rowIndex) => {
+                const rowNum = rowIndex + 1;
                 const rowDiv = document.createElement('div');
                 rowDiv.className = 'row';
 
+                // 左側排號
                 const leftLabel = document.createElement('div');
                 leftLabel.className = 'row-label';
-                leftLabel.innerText = `第${i}排`;
+                leftLabel.innerText = `第${rowNum}排`;
                 rowDiv.appendChild(leftLabel);
 
+                // 左側座位區
                 const leftBlock = document.createElement('div');
                 leftBlock.className = 'seat-block';
-                for (let j = 1; j <= leftCols; j++) {
-                    leftBlock.appendChild(createSeatElement(i, j));
-                }
+                rowConfig.left.forEach(item => {
+                    leftBlock.appendChild(createSeatElement('L', rowNum, item));
+                });
                 rowDiv.appendChild(leftBlock);
 
+                // 右側座位區
                 const rightBlock = document.createElement('div');
                 rightBlock.className = 'seat-block';
-                for (let j = leftCols + 1; j <= leftCols + rightCols; j++) {
-                    rightBlock.appendChild(createSeatElement(i, j));
-                }
+                rowConfig.right.forEach(item => {
+                    rightBlock.appendChild(createSeatElement('R', rowNum, item));
+                });
                 rowDiv.appendChild(rightBlock);
 
+                // 右側排號
                 const rightLabel = document.createElement('div');
                 rightLabel.className = 'row-label';
-                rightLabel.innerText = `第${i}排`;
+                rightLabel.innerText = `第${rowNum}排`;
                 rowDiv.appendChild(rightLabel);
 
                 container.appendChild(rowDiv);
-            }
+            });
         }
 
-        function createSeatElement(row, col) {
-            const seatId = `${row}-${col}`;
+        function createSeatElement(side, row, item) {
             const seat = document.createElement('div');
             
-            if (pillars.includes(seatId)) {
+            if (item === 'P') {
                 seat.className = 'seat pillar';
                 seat.innerText = '柱';
                 return seat;
             }
+            if (item === 'E') {
+                seat.className = 'seat empty';
+                return seat;
+            }
 
+            // 正常座位
+            const seatId = `${side}-${row}-${item}`;
             seat.className = 'seat';
             seat.setAttribute('data-id', seatId);
             
             // 號碼
             const numSpan = document.createElement('span');
             numSpan.className = 'seat-num';
-            numSpan.innerText = col;
+            numSpan.innerText = item;
             seat.appendChild(numSpan);
 
             // 姓名
@@ -507,31 +534,29 @@
                     seat.classList.add('occupied');
                     
                     const data = seatingData[seatId];
-                    const studentName = typeof data === 'string' ? data : data.name;
-                    const studentId = typeof data === 'string' ? '' : data.id;
-                    
-                    nameSpan.innerText = studentName;
-                    idSpan.innerText = studentId;
+                    nameSpan.innerText = data.name;
+                    idSpan.innerText = data.id;
                 }
-                seat.addEventListener('click', () => openModal(row, col));
+                seat.addEventListener('click', () => openModal(side, row, item));
             }
             
             return seat;
         }
 
-        function openModal(row, col) {
-            const seatId = `${row}-${col}`;
+        function openModal(side, row, item) {
+            const seatId = `${side}-${row}-${item}`;
             currentActiveSeat = seatId;
             
-            document.getElementById('modal-title').innerText = `登記座位：第 ${row} 排 - ${col} 號`;
+            const sideName = side === 'L' ? '左側' : '右側';
+            document.getElementById('modal-title').innerText = `登記座位：第 ${row} 排 - ${sideName} ${item} 號`;
             const idInput = document.getElementById('student-id');
             const nameInput = document.getElementById('student-name');
             const clearBtn = document.getElementById('btn-clear');
             
             if (seatingData[seatId]) {
                 const data = seatingData[seatId];
-                nameInput.value = typeof data === 'string' ? data : data.name;
-                idInput.value = typeof data === 'string' ? '' : data.id;
+                nameInput.value = data.name;
+                idInput.value = data.id;
                 clearBtn.style.display = 'block';
             } else {
                 idInput.value = '';
@@ -595,43 +620,54 @@
         }
 
         function saveData() {
-            localStorage.setItem('寅葉講堂劃位資料_V3', JSON.stringify(seatingData));
+            localStorage.setItem('寅葉講堂劃位資料_V4', JSON.stringify(seatingData));
         }
 
         function exportData() {
             let csvContent = "\uFEFF"; 
-            csvContent += "區域,排數,座位號碼,學號,姓名/身分\n";
+            csvContent += "區域,左右側,排數,座位號碼,學號,姓名/身分\n";
             
-            for (let i = 1; i <= rows; i++) {
-                for (let j = 1; j <= leftCols + rightCols; j++) {
-                    const id = `${i}-${j}`;
-                    if (pillars.includes(id)) continue;
-                    
-                    let role = "畢業生";
-                    let studentId = "";
-                    let name = "（空位）";
-                    
-                    if (profRows.includes(i)) {
-                        role = "師長席";
-                        name = "教授保留";
-                    } else if (parentRows.includes(i)) {
-                        role = "家長席";
-                        name = "家長保留";
-                    } else if (seatingData[id]) {
-                        const data = seatingData[id];
-                        name = typeof data === 'string' ? data : data.name;
-                        studentId = typeof data === 'string' ? '' : data.id;
-                    }
-                    
-                    csvContent += `${role},${i},${j},${studentId},${name}\n`;
+            layoutConfig.forEach((rowConfig, rowIndex) => {
+                const rowNum = rowIndex + 1;
+                
+                // 處理左側匯出
+                rowConfig.left.forEach(item => {
+                    if(item === 'P' || item === 'E') return;
+                    processExportRow('L', '左', rowNum, item);
+                });
+                
+                // 處理右側匯出
+                rowConfig.right.forEach(item => {
+                    if(item === 'P' || item === 'E') return;
+                    processExportRow('R', '右', rowNum, item);
+                });
+            });
+
+            function processExportRow(sideCode, sideStr, rowNum, seatNum) {
+                const id = `${sideCode}-${rowNum}-${seatNum}`;
+                let role = "畢業生";
+                let studentId = "";
+                let name = "（空位）";
+                
+                if (profRows.includes(rowNum)) {
+                    role = "師長席";
+                    name = "教授保留";
+                } else if (parentRows.includes(rowNum)) {
+                    role = "家長席";
+                    name = "家長保留";
+                } else if (seatingData[id]) {
+                    const data = seatingData[id];
+                    name = data.name;
+                    studentId = data.id;
                 }
+                csvContent += `${role},${sideStr},${rowNum},${seatNum},${studentId},${name}\n`;
             }
             
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             const url = URL.createObjectURL(blob);
             link.setAttribute("href", url);
-            link.setAttribute("download", `寅葉電學講堂_完整劃位表.csv`);
+            link.setAttribute("download", `寅葉電學講堂_真實配置劃位表.csv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
