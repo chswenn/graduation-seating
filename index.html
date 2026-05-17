@@ -80,8 +80,8 @@
         }
         /* 座位基礎樣式 */
         .seat {
-            width: 46px;
-            height: 46px;
+            width: 52px; /* 稍微加寬以容納學號 */
+            height: 54px; /* 稍微加高 */
             background-color: #e0e0e0;
             border: 1px solid #bdbdbd;
             border-radius: 6px 6px 4px 4px;
@@ -90,7 +90,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
-            padding-top: 4px;
+            padding-top: 3px;
             font-size: 11px;
             color: #616161;
             transition: all 0.2s ease;
@@ -102,7 +102,7 @@
         .seat .seat-num {
             font-size: 10px;
             color: #9e9e9e;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
         }
         /* 座位姓名 */
         .seat .name {
@@ -115,6 +115,20 @@
             width: 100%;
             text-align: center;
             padding: 0 2px;
+            line-height: 1.2;
+        }
+        /* 座位學號 */
+        .seat .stu-id {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.85);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 100%;
+            text-align: center;
+            line-height: 1.1;
+            margin-top: 1px;
+            transform: scale(0.9);
         }
         
         /* 畢業生空位 */
@@ -143,6 +157,7 @@
             color: white;
             cursor: not-allowed;
             box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2);
+            justify-content: center;
         }
         
         /* 家長席 (深青色) */
@@ -152,6 +167,7 @@
             color: white;
             cursor: not-allowed;
             box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2);
+            justify-content: center;
         }
 
         /* 柱子樣式 */
@@ -263,13 +279,22 @@
             border-bottom: 2px solid #e8eaf6;
             padding-bottom: 10px;
         }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            color: #555;
+            font-weight: bold;
+        }
         .modal input {
             width: 100%;
-            padding: 12px;
-            margin-bottom: 25px;
+            padding: 10px 12px;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
-            font-size: 16px;
+            font-size: 15px;
             transition: border-color 0.2s;
         }
         .modal input:focus {
@@ -280,6 +305,7 @@
             display: flex;
             justify-content: flex-end;
             gap: 12px;
+            margin-top: 25px;
         }
         .modal-btn {
             padding: 10px 18px;
@@ -360,14 +386,23 @@
     <!-- 功能按鈕 -->
     <div class="controls">
         <button class="btn btn-export" onclick="exportData()">📦 匯出全場名單 (CSV)</button>
-        <button class="btn" onclick="clearAll()">🔄 重設畢業生座位</button>
     </div>
 
     <!-- 劃位彈出視窗 -->
     <div class="modal-overlay" id="modal-overlay">
         <div class="modal">
             <h3 id="modal-title">座位劃位</h3>
-            <input type="text" id="student-name" placeholder="請輸入畢業生姓名 (最多5字)" maxlength="5">
+            
+            <div class="input-group">
+                <label for="student-id">學號</label>
+                <input type="text" id="student-id" placeholder="請輸入學號 (例: 10912345)" maxlength="10">
+            </div>
+            
+            <div class="input-group">
+                <label for="student-name">姓名</label>
+                <input type="text" id="student-name" placeholder="請輸入姓名 (最多5字)" maxlength="5">
+            </div>
+
             <div class="modal-buttons">
                 <button class="modal-btn clear-seat" id="btn-clear" onclick="submitClear()">取消此位</button>
                 <button class="modal-btn cancel" onclick="closeModal()">關閉</button>
@@ -379,20 +414,16 @@
     <script>
         const container = document.getElementById('layout-container');
         
-        // 根據精算：12排 * (左6 + 右7) = 156。扣除1根柱子 = 155席 完美符合！
         const rows = 12; 
         const leftCols = 6;
         const rightCols = 7;
         
         let currentActiveSeat = null;
-        let seatingData = JSON.parse(localStorage.getItem('寅葉講堂劃位資料_V2')) || {};
+        let seatingData = JSON.parse(localStorage.getItem('寅葉講堂劃位資料_V3')) || {};
 
-        // 柱子位置 (假設在第9排最右邊)
         const pillars = ["9-13"]; 
-
-        // 區域規劃設定
-        const profRows = [1, 2];       // 第 1, 2 排為教授席
-        const parentRows = [11, 12];   // 第 11, 12 排為家長席
+        const profRows = [1, 2];       
+        const parentRows = [11, 12];   
 
         function initSeatingChart() {
             container.innerHTML = '';
@@ -401,13 +432,11 @@
                 const rowDiv = document.createElement('div');
                 rowDiv.className = 'row';
 
-                // 左側排號
                 const leftLabel = document.createElement('div');
                 leftLabel.className = 'row-label';
                 leftLabel.innerText = `第${i}排`;
                 rowDiv.appendChild(leftLabel);
 
-                // 左側座位區 (1 ~ 6 號)
                 const leftBlock = document.createElement('div');
                 leftBlock.className = 'seat-block';
                 for (let j = 1; j <= leftCols; j++) {
@@ -415,7 +444,6 @@
                 }
                 rowDiv.appendChild(leftBlock);
 
-                // 右側座位區 (7 ~ 13 號)
                 const rightBlock = document.createElement('div');
                 rightBlock.className = 'seat-block';
                 for (let j = leftCols + 1; j <= leftCols + rightCols; j++) {
@@ -423,7 +451,6 @@
                 }
                 rowDiv.appendChild(rightBlock);
 
-                // 右側排號
                 const rightLabel = document.createElement('div');
                 rightLabel.className = 'row-label';
                 rightLabel.innerText = `第${i}排`;
@@ -437,7 +464,6 @@
             const seatId = `${row}-${col}`;
             const seat = document.createElement('div');
             
-            // 處理柱子
             if (pillars.includes(seatId)) {
                 seat.className = 'seat pillar';
                 seat.innerText = '柱';
@@ -447,33 +473,46 @@
             seat.className = 'seat';
             seat.setAttribute('data-id', seatId);
             
+            // 號碼
             const numSpan = document.createElement('span');
             numSpan.className = 'seat-num';
             numSpan.innerText = col;
             seat.appendChild(numSpan);
 
+            // 姓名
             const nameSpan = document.createElement('span');
             nameSpan.className = 'name';
-            seat.appendChild(nameSpan);
+            
+            // 學號
+            const idSpan = document.createElement('span');
+            idSpan.className = 'stu-id';
 
-            // 判斷區域
             if (profRows.includes(row)) {
                 seat.classList.add('professor');
                 nameSpan.innerText = '教授';
+                seat.appendChild(nameSpan);
             } 
             else if (parentRows.includes(row)) {
                 seat.classList.add('parent');
                 nameSpan.innerText = '家長';
+                seat.appendChild(nameSpan);
             } 
             else {
                 seat.classList.add('available');
-                // 檢查是否已有學生劃位
+                seat.appendChild(nameSpan);
+                seat.appendChild(idSpan);
+
                 if (seatingData[seatId]) {
                     seat.classList.remove('available');
                     seat.classList.add('occupied');
-                    nameSpan.innerText = seatingData[seatId];
+                    
+                    const data = seatingData[seatId];
+                    const studentName = typeof data === 'string' ? data : data.name;
+                    const studentId = typeof data === 'string' ? '' : data.id;
+                    
+                    nameSpan.innerText = studentName;
+                    idSpan.innerText = studentId;
                 }
-                // 只有畢業生區可以點擊劃位
                 seat.addEventListener('click', () => openModal(row, col));
             }
             
@@ -485,21 +524,23 @@
             currentActiveSeat = seatId;
             
             document.getElementById('modal-title').innerText = `登記座位：第 ${row} 排 - ${col} 號`;
+            const idInput = document.getElementById('student-id');
             const nameInput = document.getElementById('student-name');
             const clearBtn = document.getElementById('btn-clear');
             
             if (seatingData[seatId]) {
-                nameInput.value = seatingData[seatId];
+                const data = seatingData[seatId];
+                nameInput.value = typeof data === 'string' ? data : data.name;
+                idInput.value = typeof data === 'string' ? '' : data.id;
                 clearBtn.style.display = 'block';
             } else {
+                idInput.value = '';
                 nameInput.value = '';
                 clearBtn.style.display = 'none';
             }
             
             document.getElementById('modal-overlay').classList.add('active');
-            
-            // 延遲focus避免跳視窗問題
-            setTimeout(() => nameInput.focus(), 100);
+            setTimeout(() => idInput.focus(), 100);
         }
 
         function closeModal() {
@@ -508,13 +549,22 @@
         }
 
         function submitSelection() {
+            const idInput = document.getElementById('student-id').value.trim();
             const nameInput = document.getElementById('student-name').value.trim();
+            
+            if (!idInput) {
+                alert('請輸入學號！');
+                return;
+            }
             if (!nameInput) {
                 alert('請輸入姓名！');
                 return;
             }
 
-            seatingData[currentActiveSeat] = nameInput;
+            seatingData[currentActiveSeat] = {
+                id: idInput,
+                name: nameInput
+            };
             saveData();
             
             const seatEl = document.querySelector(`[data-id="${currentActiveSeat}"]`);
@@ -522,6 +572,7 @@
                 seatEl.classList.remove('available');
                 seatEl.classList.add('occupied');
                 seatEl.querySelector('.name').innerText = nameInput;
+                seatEl.querySelector('.stu-id').innerText = idInput;
             }
             
             closeModal();
@@ -537,26 +588,19 @@
                     seatEl.classList.remove('occupied');
                     seatEl.classList.add('available');
                     seatEl.querySelector('.name').innerText = '';
+                    seatEl.querySelector('.stu-id').innerText = '';
                 }
             }
             closeModal();
         }
 
         function saveData() {
-            localStorage.setItem('寅葉講堂劃位資料_V2', JSON.stringify(seatingData));
-        }
-
-        function clearAll() {
-            if (confirm('確定要清空所有「畢業生」的劃位紀錄嗎？')) {
-                seatingData = {};
-                saveData();
-                initSeatingChart();
-            }
+            localStorage.setItem('寅葉講堂劃位資料_V3', JSON.stringify(seatingData));
         }
 
         function exportData() {
             let csvContent = "\uFEFF"; 
-            csvContent += "區域,排數,座位號碼,姓名/身分\n";
+            csvContent += "區域,排數,座位號碼,學號,姓名/身分\n";
             
             for (let i = 1; i <= rows; i++) {
                 for (let j = 1; j <= leftCols + rightCols; j++) {
@@ -564,7 +608,8 @@
                     if (pillars.includes(id)) continue;
                     
                     let role = "畢業生";
-                    let name = seatingData[id] || "（空位）";
+                    let studentId = "";
+                    let name = "（空位）";
                     
                     if (profRows.includes(i)) {
                         role = "師長席";
@@ -572,9 +617,13 @@
                     } else if (parentRows.includes(i)) {
                         role = "家長席";
                         name = "家長保留";
+                    } else if (seatingData[id]) {
+                        const data = seatingData[id];
+                        name = typeof data === 'string' ? data : data.name;
+                        studentId = typeof data === 'string' ? '' : data.id;
                     }
                     
-                    csvContent += `${role},${i},${j},${name}\n`;
+                    csvContent += `${role},${i},${j},${studentId},${name}\n`;
                 }
             }
             
@@ -589,10 +638,12 @@
             document.body.removeChild(link);
         }
 
+        // 綁定 Enter 鍵
+        document.getElementById('student-id').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') document.getElementById('student-name').focus();
+        });
         document.getElementById('student-name').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                submitSelection();
-            }
+            if (e.key === 'Enter') submitSelection();
         });
 
         initSeatingChart();
