@@ -245,6 +245,53 @@
         .btn-export:hover {
             background-color: #1b5e20;
         }
+        /* 換位/移動相關樣式 */
+        .modal-btn.swap {
+            background-color: #00897b;
+            color: white;
+            margin-right: auto; /* 讓它靠左排列 */
+        }
+        .modal-btn.swap:hover { background-color: #00695c; }
+
+        /* 提示正在換位的橫幅 */
+        .swap-indicator {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #ffb300;
+            color: #212121;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 2000;
+            align-items: center;
+            gap: 15px;
+            font-size: 15px;
+        }
+        .swap-indicator.active {
+            display: flex;
+        }
+        .swap-cancel-btn {
+            background: rgba(0,0,0,0.1);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #333;
+        }
+        .swap-cancel-btn:hover { background: rgba(0,0,0,0.2); }
+
+        /* 被選中準備換位的座位特效 */
+        .seat.swapping {
+            border: 2px dashed #d84315;
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(216, 67, 21, 0.4);
+            z-index: 10;
+        }
         /* 彈出視窗 (Modal) */
         .modal-overlay {
             position: fixed;
@@ -353,6 +400,10 @@
     </style>
 </head>
 <body>
+    <div class="swap-indicator" id="swap-indicator">
+        🔄 請點選要交換或移動到的「目標座位」
+        <button class="swap-cancel-btn" onclick="cancelSwap()">取消</button>
+    </div>
 
     <h1>中原大學 寅葉電學講堂</h1>
     <div class="subtitle">畢業生專屬劃位系統</div>
@@ -410,16 +461,23 @@
                 <label for="student-name">姓名</label>
                 <input type="text" id="student-name" placeholder="請輸入姓名 (最多5字)" maxlength="5">
             </div>
-
+            
             <div class="modal-buttons">
                 <button class="modal-btn clear-seat" id="btn-clear" onclick="submitClear()">取消此位</button>
+                <button class="modal-btn swap" id="btn-swap" onclick="startSwap()">換位 / 移動</button>
                 <button class="modal-btn cancel" onclick="closeModal()">關閉</button>
                 <button class="modal-btn confirm" onclick="submitSelection()">確認登記</button>
             </div>
+            
         </div>
     </div>
 
     <script>
+        const container = document.getElementById('layout-container');
+        let currentActiveSeat = null;
+        let pendingSwapSeat = null; // 新增：記錄正在等待換位的座位 ID
+        let seatingData = JSON.parse(localStorage.getItem('寅葉講堂劃位資料_V4')) || {};
+        
         const container = document.getElementById('layout-container');
         
         let currentActiveSeat = null;
@@ -545,25 +603,35 @@
 
         function openModal(side, row, item) {
             const seatId = `${side}-${row}-${item}`;
+    
+            // 【新增】如果目前處於「換位模式」，則執行換位邏輯，不開啟彈出視窗
+            if (pendingSwapSeat) {
+                executeSwap(pendingSwapSeat, seatId);
+                return;
+            }
+
             currentActiveSeat = seatId;
-            
+    
             const sideName = side === 'L' ? '左側' : '右側';
             document.getElementById('modal-title').innerText = `登記座位：第 ${row} 排 - ${sideName} ${item} 號`;
             const idInput = document.getElementById('student-id');
             const nameInput = document.getElementById('student-name');
             const clearBtn = document.getElementById('btn-clear');
-            
+            const swapBtn = document.getElementById('btn-swap'); // 取得換位按鈕
+    
             if (seatingData[seatId]) {
                 const data = seatingData[seatId];
                 nameInput.value = data.name;
                 idInput.value = data.id;
                 clearBtn.style.display = 'block';
+                swapBtn.style.display = 'block'; // 有人才可以換位
             } else {
                 idInput.value = '';
                 nameInput.value = '';
                 clearBtn.style.display = 'none';
+                swapBtn.style.display = 'none'; // 空位不需要換位功能
             }
-            
+    
             document.getElementById('modal-overlay').classList.add('active');
             setTimeout(() => idInput.focus(), 100);
         }
@@ -617,6 +685,62 @@
                 }
             }
             closeModal();
+        }
+        // 啟動換位模式
+        function startSwap() {
+            if (!currentActiveSeat) return;
+            pendingSwapSeat = currentActiveSeat;
+    
+            // 顯示上方提示橫幅
+            document.getElementById('swap-indicator').classList.add('active');
+    
+            // 幫原本的座位加上特效
+            const seatEl = document.querySelector(`[data-id="${pendingSwapSeat}"]`);
+            if(seatEl) seatEl.classList.add('swapping');
+    
+            // 關閉視窗，等待使用者點擊下一個座位
+            closeModal();
+        }
+
+        // 取消換位模式
+        function cancelSwap() {
+            if (pendingSwapSeat) {
+                // 移除座位特效
+                const seatEl = document.querySelector(`[data-id="${pendingSwapSeat}"]`);
+                if(seatEl) seatEl.classList.remove('swapping');
+            }
+            pendingSwapSeat = null;
+            document.getElementById('swap-indicator').classList.remove('active');
+        }
+
+        // 執行換位 / 移動邏輯
+        function executeSwap(sourceId, targetId) {
+            // 如果點到同一個位置，直接取消
+            if (sourceId === targetId) {
+                cancelSwap();
+                return;
+            }
+
+            // 將兩個位置的資料進行交換
+            const sourceData = seatingData[sourceId];
+            const targetData = seatingData[targetId];
+
+            if (targetData) {
+                seatingData[sourceId] = targetData; // 目標位置有人，互相交換
+            } else {
+                delete seatingData[sourceId]; // 目標位置是空位，單純移動過去，清空原位
+            }
+
+            if (sourceData) {
+                seatingData[targetId] = sourceData;
+            } else {
+                delete seatingData[targetId];
+            }
+
+            // 存檔並重繪整個座位表
+            saveData();
+            cancelSwap();
+            initSeatingChart(); // 重新渲染畫面以顯示最新狀態
         }
 
         function saveData() {
